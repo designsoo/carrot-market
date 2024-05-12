@@ -6,6 +6,15 @@
   a {
     @apply text-orange-500 underline-offset-4;
   }
+
+  .autofill-text:-webkit-autofill {
+    -webkit-text-fill-color: white;
+  }
+
+  .autofill-input {
+    @apply autofill-text;
+    @apply autofill:shadow-[inset_0_0_0px_1000px_#171717];
+  }
 }
 
 @layer components {
