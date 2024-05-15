@@ -8,7 +8,7 @@ import db from '@/lib/db';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { redirect } from 'next/navigation';
-import getSesstion from '@/lib/session';
+import getSession from '@/lib/getSession';
 interface checkPasswordsProps {
   password: string;
   confirm_password: string;
@@ -18,32 +18,6 @@ const checkUsername = (username: string) => !username.includes('potato');
 
 const checkPasswords = ({ password, confirm_password }: checkPasswordsProps) =>
   password === confirm_password;
-
-// DB에 있는 데이터와 중복되는지 확인(username)
-const checkUniqueUsername = async (username: string) => {
-  const user = await db.user.findUnique({
-    where: {
-      username,
-    },
-    select: {
-      id: true,
-    },
-  });
-  return !Boolean(user);
-};
-
-// DB에 있는 데이터와 중복되는지 확인(email)
-const checkUniqueEmail = async (email: string) => {
-  const user = await db.user.findUnique({
-    where: {
-      email,
-    },
-    select: {
-      id: true,
-    },
-  });
-  return Boolean(user) === false;
-};
 
 const fromSchema = z
   .object({
@@ -56,16 +30,50 @@ const fromSchema = z
       .max(10, 'That is too loooog!!')
       .toLowerCase()
       .trim()
-      .refine(checkUsername, 'No potatoes allowed!!!')
-      .refine(checkUniqueUsername, 'This username is already taken'),
-    email: z
-      .string()
-      .email()
-      .toLowerCase()
-      .refine(checkUniqueEmail, 'There is an account already registered with that email'),
+      .refine(checkUsername, 'No potatoes allowed!!!'),
+    email: z.string().email().toLowerCase(),
     password: z.string().min(PASSWORD_MIN_LENGTH),
     // .regex(PASSWORD_REGEX, PASSWORD_REGEX_ERROR),
     confirm_password: z.string().min(PASSWORD_MIN_LENGTH),
+  })
+
+  .superRefine(async ({ username }, ctx) => {
+    const user = await db.user.findUnique({
+      where: {
+        username,
+      },
+      select: {
+        id: true,
+      },
+    });
+    if (user) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'This username is taken',
+        path: ['username'],
+        fatal: true,
+      });
+      return z.NEVER;
+    }
+  })
+  .superRefine(async ({ email }, ctx) => {
+    const user = await db.user.findUnique({
+      where: {
+        email,
+      },
+      select: {
+        id: true,
+      },
+    });
+    if (user) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Ths email is taken',
+        path: ['email'],
+        fatal: true,
+      });
+      return z.NEVER;
+    }
   })
   .refine(checkPasswords, {
     message: 'Both passwords should be the same!',
@@ -83,6 +91,7 @@ export async function createAccount(prevState: any, formData: FormData) {
   const result = await fromSchema.safeParseAsync(data);
 
   if (!result.success) {
+    console.log('zod error', result.error.flatten());
     return result.error.flatten();
   } else {
     // hash password
@@ -98,7 +107,7 @@ export async function createAccount(prevState: any, formData: FormData) {
         id: true,
       },
     });
-    const session = await getSesstion();
+    const session = await getSession();
     session.id = user.id;
     await session.save();
     redirect('/profile');
