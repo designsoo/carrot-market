@@ -91,7 +91,6 @@ export async function createAccount(prevState: any, formData: FormData) {
   const result = await fromSchema.safeParseAsync(data);
 
   if (!result.success) {
-    console.log('zod error', result.error.flatten());
     return result.error.flatten();
   } else {
     // hash password
