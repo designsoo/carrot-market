@@ -2,7 +2,7 @@
 
 import { InitialProducts } from '@/app/(tabs)/products/page';
 import ListProduct from './list-product';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getMoreProducts } from '@/app/(tabs)/products/actions';
 
 interface ProductListProps {
@@ -18,38 +18,60 @@ export default function ProductList({ initialProducts }: ProductListProps) {
   const [isLastPage, setIsLastPage] = useState(false);
   // 데이터 로딩중
   const [isLoading, setIsLoading] = useState(false);
+  // observer trigger
+  const trigger = useRef<HTMLSpanElement>(null);
 
-  // 버튼 클릭 시 하나씩 추가되는 함수
-  const onLoadMoreProduct = async () => {
-    setIsLoading(true);
-    const newProduct = await getMoreProducts(page + 1);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      async (entries: IntersectionObserverEntry[], observer: IntersectionObserver) => {
+        const element = entries[0];
+        if (element.isIntersecting && trigger.current) {
+          // trigger 감지되면 중지
+          observer.unobserve(trigger.current);
+          setIsLoading(true);
 
-    // 상품을 가진 리스트일 경우에만 +1
-    if (newProduct.length !== 0) {
-      setPage((prev) => prev + 1);
-      setProducts((prev) => [...prev, ...newProduct]);
-    } else {
-      setIsLastPage(true);
+          // 상품 불러오기
+          const newProducts = await getMoreProducts(page + 1);
+          // 상품을 가진 리스트일 경우에만 +1
+          if (newProducts.length !== 0) {
+            setPage((prev) => prev + 1);
+            setProducts((prev) => [...prev, ...newProducts]);
+          } else {
+            setIsLastPage(true);
+          }
+          setIsLoading(false);
+        }
+      },
+      {
+        threshold: 1.0, // 상품을 가진 리스트일 경우에만 +1
+      },
+    );
+    if (trigger.current) {
+      observer.observe(trigger.current);
     }
-    setIsLoading(false);
-  };
+    // 컴포넌트 unmount일 경우 중지
+    return () => {
+      observer.disconnect();
+    };
+  }, [page]);
 
   return (
     <div className='flex flex-col gap-5 p-5'>
       {products.map((product) => (
         <ListProduct key={product.id} {...product} />
       ))}
-      {isLastPage ? (
-        'No more items'
-      ) : (
-        <button
-          className='mx-auto w-fit rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold hover:opacity-90 active:scale-95'
-          disabled={isLoading}
-          onClick={onLoadMoreProduct}
+
+      {!isLastPage ? (
+        <span
+          ref={trigger}
+          style={{
+            marginTop: `${page + 1 * 900}vh`,
+          }}
+          className='mx-auto mb-96 w-fit rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold hover:opacity-90 active:scale-95'
         >
           {isLoading ? 'Loading...' : ' Load More'}
-        </button>
-      )}
+        </span>
+      ) : null}
     </div>
   );
 }
