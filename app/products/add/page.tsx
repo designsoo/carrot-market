@@ -5,14 +5,24 @@ import Input from '@/components/input';
 import { PhotoIcon } from '@heroicons/react/24/solid';
 import { useState } from 'react';
 import uploadProduct, { getUploadUrl } from './actions';
-import { useFormState } from 'react-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { ProductType, productSchema } from './schema';
 
 const MB = 1024 * 1024;
 
 export default function AddProduct() {
   const [preview, setPreview] = useState('');
   const [uploadUrl, setUploadUrl] = useState('');
-  const [photoId, setPhotoId] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<ProductType>({
+    resolver: zodResolver(productSchema),
+  });
 
   const isFileSizeExceeded = (file: File) => file.size > 3 * MB;
 
@@ -32,17 +42,18 @@ export default function AddProduct() {
     // 3. 업로드 이미지 미리보기
     const url = URL.createObjectURL(file);
     setPreview(url);
+    setFile(file);
     const { success, result } = await getUploadUrl();
     if (success) {
       const { id, uploadURL } = result;
+      const photoUrl = `https://imagedelivery.net/gHftqKLNBQ-NOWw8XS0zUw/${id}`;
       setUploadUrl(uploadURL);
-      setPhotoId(id);
+      setValue('photo', photoUrl);
     }
   };
 
-  const interceptAction = async (_: any, formData: FormData) => {
+  const onSubmit = handleSubmit(async (data: ProductType) => {
     // 이미지 cloudflare 업로드
-    const file = formData.get('photo');
     if (!file) {
       alert('이미지 등록은 필수 입니다.');
       return;
@@ -57,16 +68,22 @@ export default function AddProduct() {
       return;
     }
     // formData의 'photo' 대체하기
-    const photoUrl = `https://imagedelivery.net/gHftqKLNBQ-NOWw8XS0zUw/${photoId}`;
-    formData.set('photo', photoUrl);
+    const formData = new FormData();
+    formData.append('title', data.title);
+    formData.append('price', data.price + '');
+    formData.append('description', data.description);
+    formData.append('photo', data.photo);
     // 상품 업로드 요청
-    return uploadProduct(_, formData);
+    return uploadProduct(formData);
+  });
+
+  const onValid = async () => {
+    await onSubmit(); // react-hook-form에 의해 자동으로 호출
   };
-  const [state, dispatch] = useFormState(interceptAction, null);
 
   return (
     <div>
-      <form action={dispatch} className='flex flex-col gap-5 p-5'>
+      <form action={onValid} className='flex flex-col gap-5 p-5'>
         <label
           htmlFor='photo'
           className='flex aspect-square cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-neutral-300 bg-cover bg-center text-neutral-300'
@@ -78,7 +95,7 @@ export default function AddProduct() {
             <>
               <PhotoIcon className='w-20' />
               <div className='text-neutral-400'>
-                사진을 추가해주세요. {state?.fieldErrors.photo}
+                사진을 추가해주세요. {errors.photo?.message}
               </div>
             </>
           )}
@@ -92,24 +109,24 @@ export default function AddProduct() {
           className='hidden'
         />
         <Input
-          name='title'
+          {...register('title')}
           type='text'
           placeholder='제목'
-          errors={state?.fieldErrors.title}
+          errors={[errors.title?.message ?? '']}
           required
         />
         <Input
-          name='price'
+          {...register('price')}
           type='number'
           placeholder='가격'
-          errors={state?.fieldErrors.price}
+          errors={[errors.price?.message ?? '']}
           required
         />
         <Input
-          name='description'
+          {...register('description')}
           type='text'
           placeholder='자세한 설명'
-          errors={state?.fieldErrors.description}
+          errors={[errors.description?.message ?? '']}
           required
         />
         <Button text='작성 완료' />
