@@ -19,7 +19,7 @@ export default function ListProduct({
   created_at,
 }: ListProductProps) {
   return (
-    <Link href={`/products/${id}`} className='flex gap-5'>
+    <Link href={`/products/view/${id}`} className='flex gap-5'>
       <div className='relative size-28 shrink-0 overflow-hidden rounded-md'>
         <Image fill src={`${photo}/thumbnail`} alt={title} className='object-cover' />
       </div>
