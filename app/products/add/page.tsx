@@ -8,8 +8,9 @@ import uploadProduct, { getUploadUrl } from './actions';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ProductType, productSchema } from './schema';
+import { isFileSizeExceeded } from '@/lib/isFileSizeExceeded';
 
-const MB = 1024 * 1024;
+const MAXIMUM_FILE_SIZE = 3;
 
 export default function AddProduct() {
   const [preview, setPreview] = useState('');
@@ -24,8 +25,6 @@ export default function AddProduct() {
     resolver: zodResolver(productSchema),
   });
 
-  const isFileSizeExceeded = (file: File) => file.size > 3 * MB;
-
   const onImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     // 1. 유저가 이미지를 업로드 했는지 확인
     const {
@@ -34,15 +33,19 @@ export default function AddProduct() {
     if (!files) return;
 
     const file = files[0];
+
     // 2. 이미지 최대 사이즈 3MB 이하인지 확인
-    if (isFileSizeExceeded(file)) {
+    if (isFileSizeExceeded(file, MAXIMUM_FILE_SIZE)) {
       alert('3MB 이하인 이미지만 첨부 가능합니다.');
       return;
     }
+
     // 3. 업로드 이미지 미리보기
     const url = URL.createObjectURL(file);
     setPreview(url);
     setFile(file);
+
+    // 4. CDN 서버에서 URL 받아오기
     const { success, result } = await getUploadUrl();
     if (success) {
       const { id, uploadURL } = result;
@@ -53,11 +56,12 @@ export default function AddProduct() {
   };
 
   const onSubmit = handleSubmit(async (data: ProductType) => {
-    // 이미지 cloudflare 업로드
+    // Cloudflare CDN 이미지 업로드
     if (!file) {
       alert('이미지 등록은 필수 입니다.');
       return;
     }
+
     const cloudflareForm = new FormData();
     cloudflareForm.append('file', file);
     const response = await fetch(uploadUrl, {
@@ -67,13 +71,15 @@ export default function AddProduct() {
     if (response.status !== 200) {
       return;
     }
+
     // formData의 'photo' 대체하기
     const formData = new FormData();
     formData.append('title', data.title);
     formData.append('price', data.price + '');
     formData.append('description', data.description);
     formData.append('photo', data.photo);
-    // 상품 업로드 요청
+
+    // 상품 업로드
     return uploadProduct(formData);
   });
 
