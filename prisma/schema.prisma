@@ -54,8 +54,8 @@ model Post {
   updated_at  DateTime  @updatedAt
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      Int
-  commnets    Comment[]
-  Likes       Like[]
+  comments    Comment[]
+  likes       Like[]
 }
 
 model Comment {
