@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import db from '@/lib/db';
 import getSession from '@/lib/getSession';
 import { formatToWon } from '@/lib/utils';
@@ -93,6 +93,29 @@ export default async function ProductDetail({ params }: Params) {
   // 로그인한 유저와 작성자가 동일한지 확인
   const isOwner = await getIsOwner(product.userId);
 
+  const createChatRoom = async () => {
+    'use server';
+    const session = await getSession();
+    const room = await db.chatRoom.create({
+      data: {
+        users: {
+          connect: [
+            {
+              id: product.userId,
+            },
+            {
+              id: session.id,
+            },
+          ],
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    redirect(`/chats/${room.id}`);
+  };
+
   return (
     <div>
       <div className='relative aspect-square'>
@@ -137,12 +160,11 @@ export default async function ProductDetail({ params }: Params) {
         {isOwner ? (
           <DeletButton productId={product.id} imageId={imageId} />
         ) : (
-          <Link
-            className='rounded-md bg-orange-500 px-5 py-2.5 font-semibold text-white'
-            href={``}
-          >
-            채팅하기
-          </Link>
+          <form action={createChatRoom}>
+            <button className='rounded-md bg-orange-500 px-5 py-2.5 font-semibold text-white'>
+              채팅하기
+            </button>
+          </form>
         )}
       </div>
     </div>
