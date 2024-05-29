@@ -1,10 +1,10 @@
 export type UserInfo = {
-  id?: number;
-  avatar: string | null;
+  id: number;
   username: string;
-} | null;
+  avatar: string | null;
+};
 
-export type Comments = {
+export type Comment = {
   id: number;
   payload: string;
   created_at: Date;
@@ -12,4 +12,6 @@ export type Comments = {
   userId: number;
   postId: number;
   user: UserInfo;
-}[];
+};
+
+export type Comments = Comment[];
