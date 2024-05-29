@@ -1,41 +1,44 @@
 'use client';
 
-import { Comments, UserInfo } from '@/types/comments';
+import { Comment, Comments as CommentsType, UserInfo } from '@/types/comments';
 import CommentForm from './comment-form';
 import { formatToTimeAgo } from '@/lib/utils';
 import Image from 'next/image';
 import { addComment } from '@/app/posts/[id]/actions';
-import { useOptimistic } from 'react';
+import { startTransition, useOptimistic } from 'react';
 
 interface CommentsProps {
   author: UserInfo;
   userId: number;
   postId: number;
-  allComment: Comments;
+  allComment: CommentsType;
 }
 
-export default function Comments({
-  author,
-  userId,
-  postId,
-  allComment,
-}: CommentsProps) {
-  const [comments, reducerFn] = useOptimistic(
+export default function Comments({ author, userId, postId, allComment }: CommentsProps) {
+  const [optimisticComments, setOptimisticComments] = useOptimistic(
     allComment,
-    (prevComments, newComment: any) => [...prevComments, newComment],
+    (prevComments, newComment: Comment) => [...prevComments, newComment],
   );
 
   const handleSubmit = async (payload: string, postId: number) => {
     const newComment = {
-      id: comments.length + 1,
+      id: optimisticComments.length + 1,
       payload,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      postId,
+      created_at: new Date(),
+      updated_at: new Date(),
       userId,
+      postId,
+      user: {
+        id: userId,
+        avatar: null,
+        username: '',
+      },
     };
 
-    reducerFn(newComment);
+    startTransition(() => {
+      setOptimisticComments(newComment);
+    });
+
     await addComment(payload, postId);
   };
 
@@ -47,13 +50,13 @@ export default function Comments({
         <div className='mb-2 flex items-center gap-2'>
           <h2>Comments </h2>
           <span className='text-l size-5 rounded-full bg-neutral-600 text-center text-xs leading-5 text-white'>
-            {comments.length}
+            {optimisticComments.length}
           </span>
         </div>
         <CommentForm handleSubmit={handleSubmit} postId={postId} isAuthor={isAuthor} />
       </div>
       <ul>
-        {comments.map((comment) => (
+        {optimisticComments.map((comment) => (
           <li key={comment.id} className='flex gap-3 border-b border-neutral-700 py-4'>
             <div className='relative size-10 shrink-0 overflow-hidden rounded-full'>
               <Image src={comment.user?.avatar ?? ''} alt='user-avatar' fill />
